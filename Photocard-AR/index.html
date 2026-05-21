@@ -349,50 +349,45 @@
 </a-scene>
 
 <script>
-  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-
   function startAR() {
-    // Desktop: tampilkan notice
-    if (!isMobile) {
-      document.getElementById('splash').classList.add('out');
-      setTimeout(() => {
-        document.getElementById('desktop').style.display = 'flex';
-      }, 550);
+    // Cek apakah browser support kamera
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Browser ini tidak support kamera. Coba Chrome atau Safari.');
       return;
     }
-
-    // Mobile: mulai AR
+ 
     document.getElementById('splash').classList.add('out');
-
+ 
     setTimeout(() => {
       const scene = document.getElementById('scene');
       scene.style.display = 'block';
       document.getElementById('overlay').classList.add('on');
-
-      // Tunggu scene siap lalu pasang event marker
-      scene.addEventListener('loaded', () => {
+ 
+      const attachMarker = () => {
         const marker = document.getElementById('marker');
-
+ 
         marker.addEventListener('markerFound', () => {
-          // Play video saat marker ketemu
-          const vid = document.getElementById('ar-video');
-          if (vid) vid.play().catch(() => {});
-
-          // Tampilkan toast
+          document.getElementById('ar-video')?.play().catch(() => {});
           const toast = document.getElementById('toast');
           toast.classList.add('show');
           setTimeout(() => toast.classList.remove('show'), 2800);
         });
-
+ 
         marker.addEventListener('markerLost', () => {
-          const vid = document.getElementById('ar-video');
-          if (vid) vid.pause();
+          document.getElementById('ar-video')?.pause();
         });
-      });
-
+      };
+ 
+      // Fallback: kalau scene sudah loaded sebelum listener dipasang
+      if (scene.hasLoaded) {
+        attachMarker();
+      } else {
+        scene.addEventListener('loaded', attachMarker);
+      }
+ 
     }, 600);
   }
-
+ 
   // Cegah zoom double-tap
   let lastTap = 0;
   document.addEventListener('touchend', e => {
