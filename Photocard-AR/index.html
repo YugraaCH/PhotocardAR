@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Photocard AR ✨</title>
+
+  <script src="https://cdn.jsdelivr.net/gh/aframevr/aframe@1.4.0/dist/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Syne', sans-serif;
+      background: #080810;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    /* ─────────────────────────────
+       SPLASH SCREEN
+    ───────────────────────────── */
+    #splash {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #080810;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 32px;
+      transition: opacity .5s ease, transform .5s ease;
+    }
+    #splash.out {
+      opacity: 0; pointer-events: none;
+      transform: scale(1.05);
+    }
+
+    /* ambient glow */
+    .glow-bg {
+      position: absolute; inset: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 55% 40% at 50% 65%,
+          rgba(160, 90, 255, .2) 0%, transparent 70%);
+    }
+
+    .splash-inner {
+      position: relative; z-index: 1;
+      max-width: 340px; width: 100%;
+      text-align: center;
+    }
+
+    /* logo mark */
+    .logo {
+      width: 68px; height: 68px; border-radius: 18px;
+      margin: 0 auto 22px;
+      background: linear-gradient(135deg, #a05fff 0%, #5b2ee8 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+      box-shadow: 0 0 0 1px rgba(160,95,255,.3),
+                  0 0 40px rgba(160,95,255,.35);
+      animation: logoGlow 2.6s ease-in-out infinite;
+    }
+    @keyframes logoGlow {
+      0%,100% { box-shadow: 0 0 0 1px rgba(160,95,255,.3), 0 0 40px rgba(160,95,255,.35); }
+      50%      { box-shadow: 0 0 0 1px rgba(160,95,255,.5), 0 0 65px rgba(160,95,255,.6); }
+    }
+
+    h1 {
+      font-size: 26px; font-weight: 800;
+      letter-spacing: -.4px; line-height: 1.2;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, #fff 35%, #c09aff);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    .tagline {
+      font-size: 13px; color: rgba(255,255,255,.45);
+      line-height: 1.7; margin-bottom: 30px;
+    }
+
+    /* step pills */
+    .steps {
+      display: flex; flex-direction: column; gap: 9px;
+      margin-bottom: 28px; text-align: left;
+    }
+    .step-pill {
+      display: flex; align-items: center; gap: 11px;
+      background: rgba(255,255,255,.04);
+      border: 0.5px solid rgba(255,255,255,.1);
+      border-radius: 10px; padding: 9px 13px;
+      font-size: 12px; color: rgba(255,255,255,.65);
+      line-height: 1.4;
+    }
+    .step-num {
+      min-width: 20px; height: 20px; border-radius: 50%;
+      background: rgba(160,95,255,.25);
+      border: 1px solid rgba(160,95,255,.4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 800; color: #c09aff;
+    }
+
+    /* CTA button */
+    .btn {
+      width: 100%; padding: 15px;
+      border-radius: 13px; border: none; cursor: pointer;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px; font-weight: 800;
+      background: linear-gradient(135deg, #a05fff, #5b2ee8);
+      color: #fff;
+      box-shadow: 0 6px 28px rgba(91,46,232,.4);
+      letter-spacing: .2px;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .btn:active { transform: scale(.97); box-shadow: 0 3px 14px rgba(91,46,232,.3); }
+
+    /* ─────────────────────────────
+       SCAN OVERLAY
+    ───────────────────────────── */
+    #overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 100;
+      pointer-events: none;
+    }
+    #overlay.on { display: block; }
+
+    /* corner brackets */
+    .br { position: absolute; width: 48px; height: 48px; }
+    .br::before, .br::after { content: ''; position: absolute; background: #a05fff; border-radius: 1.5px; }
+    .br::before { width: 2.5px; height: 100%; }
+    .br::after  { height: 2.5px; width: 100%; }
+
+    .br.tl { top: calc(50% - 80px); left: calc(50% - 66px); }
+    .br.tl::before { left: 0; top: 0; }
+    .br.tl::after  { top: 0; left: 0; }
+
+    .br.tr { top: calc(50% - 80px); left: calc(50% + 18px); }
+    .br.tr::before { right: 0; top: 0; }
+    .br.tr::after  { top: 0; right: 0; }
+
+    .br.bl { top: calc(50% + 32px); left: calc(50% - 66px); }
+    .br.bl::before { left: 0; bottom: 0; }
+    .br.bl::after  { bottom: 0; left: 0; }
+
+    .br.br2 { top: calc(50% + 32px); left: calc(50% + 18px); }
+    .br.br2::before { right: 0; bottom: 0; }
+    .br.br2::after  { bottom: 0; right: 0; }
+
+    /* sweep line */
+    .sweep {
+      position: absolute;
+      left: calc(50% - 66px); width: 132px; height: 1.5px;
+      background: linear-gradient(90deg, transparent, #a05fff 30%, #fff 50%, #a05fff 70%, transparent);
+      top: calc(50% - 80px);
+      animation: sweep 2s ease-in-out infinite;
+    }
+    @keyframes sweep {
+      0%   { top: calc(50% - 80px); opacity: .9; }
+      50%  { top: calc(50% + 80px); opacity: .9; }
+      100% { top: calc(50% - 80px); opacity: .9; }
+    }
+
+    /* "found" toast */
+    #toast {
+      position: absolute;
+      top: 44px; left: 50%;
+      transform: translateX(-50%) translateY(-16px);
+      background: rgba(160,95,255,.18);
+      border: 1px solid rgba(160,95,255,.45);
+      border-radius: 40px;
+      padding: 7px 18px;
+      font-size: 12px; font-weight: 700; color: #d0aaff;
+      letter-spacing: .3px; white-space: nowrap;
+      opacity: 0; pointer-events: none;
+      transition: opacity .35s, transform .35s;
+      backdrop-filter: blur(10px);
+    }
+    #toast.show {
+      opacity: 1; transform: translateX(-50%) translateY(0);
+    }
+
+    /* hint text */
+    .hint {
+      position: absolute;
+      bottom: 40px; left: 0; right: 0;
+      text-align: center;
+      font-size: 12px; font-weight: 700;
+      color: rgba(255,255,255,.45);
+      letter-spacing: .8px; pointer-events: none;
+    }
+
+    /* ─────────────────────────────
+       DESKTOP NOTICE
+    ───────────────────────────── */
+    #desktop {
+      display: none;
+      position: fixed; inset: 0; z-index: 300;
+      background: #080810;
+      flex-direction: column; align-items: center;
+      justify-content: center; gap: 14px;
+      padding: 40px; text-align: center;
+    }
+    #desktop h2 { font-size: 20px; font-weight: 800; }
+    #desktop p  { font-size: 13px; color: rgba(255,255,255,.45); line-height: 1.7; max-width: 300px; }
+    .qr-hint {
+      background: rgba(160,95,255,.12);
+      border: 1px solid rgba(160,95,255,.3);
+      border-radius: 10px; padding: 10px 20px;
+      font-size: 12px; color: #c09aff; font-weight: 700;
+    }
+
+    /* hide A-Frame VR button */
+    .a-enter-vr-button, .a-orientation-modal { display: none !important; }
+
+    a-scene {
+      position: fixed !important; inset: 0 !important; z-index: 0 !important;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ SPLASH ══ -->
+<div id="splash">
+  <div class="glow-bg"></div>
+  <div class="splash-inner">
+    <div class="logo">✦</div>
+    <h1>Scan Photocardmu<br>Lihat Keajaibannya</h1>
+    <p class="tagline">Animasi spesial tersembunyi di balik<br>photocard kamu ✨</p>
+    <div class="steps">
+      <div class="step-pill">
+        <span class="step-num">1</span>
+        Izinkan akses kamera saat diminta browser
+      </div>
+      <div class="step-pill">
+        <span class="step-num">2</span>
+        Arahkan kamera ke photocard kamu
+      </div>
+      <div class="step-pill">
+        <span class="step-num">3</span>
+        Tahan stabil — animasi akan muncul otomatis!
+      </div>
+    </div>
+    <button class="btn" onclick="startAR()">Buka Kamera ✦</button>
+  </div>
+</div>
+
+<!-- ══ SCAN OVERLAY ══ -->
+<div id="overlay">
+  <div id="toast">✦ Photocard terdeteksi!</div>
+  <div class="br tl"></div>
+  <div class="br tr"></div>
+  <div class="br bl"></div>
+  <div class="br br2"></div>
+  <div class="sweep"></div>
+  <p class="hint">ARAHKAN KE PHOTOCARD</p>
+</div>
+
+<!-- ══ DESKTOP NOTICE ══ -->
+<div id="desktop">
+  <div class="logo" style="margin:0">✦</div>
+  <h2>Buka di HP kamu!</h2>
+  <p>Halaman ini butuh kamera HP untuk menampilkan AR. Scan QR di bawah packaging photocard kamu, atau ketik link-nya langsung di browser HP.</p>
+  <div class="qr-hint">📱 Buka link ini di browser HP</div>
+  <p style="font-size:11px;color:rgba(255,255,255,.2);margin-top:4px">Powered by AR.js — no app needed</p>
+</div>
+
+<!-- ══ A-FRAME AR SCENE ══ -->
+<a-scene
+  id="scene"
+  vr-mode-ui="enabled: false"
+  renderer="logarithmicDepthBuffer: true; precision: medium;"
+  embedded
+  arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
+  style="display:none"
+>
+  <a-assets>
+    <!--
+    ┌──────────────────────────────────────────────────────┐
+    │  ✏️  GANTI INI: nama file video kamu                  │
+    │  Contoh: src="animasi.mp4"                           │
+    │  Taruh file .mp4 satu folder sama HTML ini           │
+    └──────────────────────────────────────────────────────┘
+    -->
+    <video
+      id="ar-video"
+      src="VIDEO_KAMU.mp4"
+      loop
+      playsinline
+      webkit-playsinline
+      muted
+      preload="auto"
+      crossorigin="anonymous"
+    ></video>
+  </a-assets>
+
+  <a-light type="ambient" color="#ffffff" intensity="1.5"></a-light>
+
+  <!--
+  ┌──────────────────────────────────────────────────────────┐
+  │  ✏️  GANTI INI: url marker photocard kamu                │
+  │                                                          │
+  │  Cara dapat marker:                                      │
+  │  1. Buka: carnaux.github.io/NFT-Marker-Creator           │
+  │  2. Upload foto photocard → Generate → Download          │
+  │  3. Taruh file .fset/.fset3/.iset di folder marker/      │
+  │  4. Ganti url di bawah jadi: "marker/nama-file-kamu"     │
+  │     (tanpa ekstensi!)                                    │
+  │                                                          │
+  │  Contoh: url="marker/photocard-seri1"                    │
+  └──────────────────────────────────────────────────────────┘
+  -->
+  <a-nft
+    id="marker"
+    type="nft"
+    url="marker/NAMA_MARKER_KAMU"
+    smooth="true"
+    smoothCount="10"
+    smoothTolerance="0.01"
+    smoothThreshold="5"
+  >
+    <!--
+    ┌──────────────────────────────────────────────────────────┐
+    │  ✨ KONTEN AR — video muncul di atas photocard           │
+    │                                                          │
+    │  Ukuran:                                                 │
+    │  • width / height → sesuaikan rasio video kamu          │
+    │    (misal video 9:16 → width="1" height="1.78")         │
+    │    (misal video 1:1  → width="1.2" height="1.2")        │
+    │                                                          │
+    │  Posisi:                                                 │
+    │  • position="0 X 0" — angka tengah = naik/turun         │
+    │    0.75 = sedikit naik dari permukaan photocard          │
+    │    Tambah nilai = lebih jauh ke atas                     │
+    │                                                          │
+    │  rotation="-90 0 0" → jangan diubah, biar flat          │
+    └──────────────────────────────────────────────────────────┘
+    -->
+    <a-video
+      src="#ar-video"
+      width="1"
+      height="1.5"
+      position="0 0.75 0"
+      rotation="-90 0 0"
+    ></a-video>
+
+  </a-nft>
+
+  <a-entity camera></a-entity>
+</a-scene>
+
+<script>
+  function startAR() {
+    // Cek apakah browser support kamera
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Browser ini tidak support kamera. Coba Chrome atau Safari.');
+      return;
+    }
+
+    document.getElementById('splash').classList.add('out');
+
+    setTimeout(() => {
+      const scene = document.getElementById('scene');
+      scene.style.display = 'block';
+      document.getElementById('overlay').classList.add('on');
+
+      const attachMarker = () => {
+        const marker = document.getElementById('marker');
+
+        marker.addEventListener('markerFound', () => {
+          document.getElementById('ar-video')?.play().catch(() => {});
+          const toast = document.getElementById('toast');
+          toast.classList.add('show');
+          setTimeout(() => toast.classList.remove('show'), 2800);
+        });
+
+        marker.addEventListener('markerLost', () => {
+          document.getElementById('ar-video')?.pause();
+        });
+      };
+
+      // Fallback: kalau scene sudah loaded sebelum listener dipasang
+      if (scene.hasLoaded) {
+        attachMarker();
+      } else {
+        scene.addEventListener('loaded', attachMarker);
+      }
+
+    }, 600);
+  }
+
+  // Cegah zoom double-tap
+  let lastTap = 0;
+  document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if (now - lastTap < 300) e.preventDefault();
+    lastTap = now;
+  }, { passive: false });
+</script>
+</body>
+</html>
